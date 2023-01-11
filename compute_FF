@@ -1,0 +1,116 @@
+#!/usr/bin/env python
+import argparse as ap
+import configparser
+import functions as func
+import injections as inj
+import pycbc
+from pycbc import waveform, conversions, filter, types, distributions, detector, psd
+import h5py
+import numpy as np
+import time
+import Pegasus.DAX3 as dax
+import pycbc.workflow as wf
+import pycbc.workflow.pegasus_workflow as wdax
+from pycbc.workflow import WorkflowConfigParser
+
+def write(filename, sg_ind, FF_array, recovered_tau, sigmasqs, sg, best_template):
+	m1 = np.array([x.m1 for x in sg])
+	m2 = np.array([x.m2 for x in sg])
+	tau0 = np.array([x.tau0 for x in sg])
+	tau3 = np.array([x.tau3 for x in sg])
+
+	with h5py.File(filename, 'w') as f:
+			f.create_dataset("sg_ind", data=sg_ind)
+			f.create_dataset("FF", data=FF_array)
+			f.create_dataset("recovered_tau0", data=recovered_tau)
+			f.create_dataset("sg_mass1", data=m1)
+			f.create_dataset("sg_mass2", data=m2)
+			f.create_dataset("sg_tau0", data=tau0)
+			f.create_dataset("sg_tau3", data=tau3)
+			f.create_dataset("sigmasqs", data=sigmasqs)
+			f.create_dataset("best_template", data=best_template)
+	f.close()
+
+
+# Command line parser
+parser = ap.ArgumentParser()
+parser.add_argument('--psd_file', 
+		required = True,
+		help ='specify ASD file')
+parser.add_argument('--injections', 
+		required = True,
+		help ='specify injection file')
+
+parser.add_argument('--approximant_sg', 
+		required = True,
+		help ='specify approximant used for signals')
+parser.add_argument('--sg_ind', 
+		required = True, type=int,
+		help ='specify the index of signal to be analyzed as per the injection file')
+parser.add_argument('--HMs', 
+		required = True, type=int,
+		help ='specify 1(0) to generate signals with(without) HMs')
+
+parser.add_argument('-tb', '--template_bank', 
+		required=True,
+		help ='specify template bank')
+parser.add_argument('--approximant_tb', 
+		required = True,
+		help ='specify approximant used for templates')
+parser.add_argument('--indices_file', 
+		help ='specify file containing indices of templates around the injections')
+parser.add_argument('--split_ind', 
+		required=True, type=int,
+		help ='Index of the template sub-region to compute matches -- ranging from [0,9] ')
+parser.add_argument('--nsplits', 
+		required=True, type=int, default=10,
+		help ='Number of splits for the local template region')
+
+parser.add_argument('--f_min', 
+		required = True, type=float,
+		help ='Specify lower frequency for the analysis')
+parser.add_argument('--sampling_freq', 
+		required = True, type=float,
+		help ='Specify sampling frequency')
+parser.add_argument('--sampling_rate', 
+		required = True, type=float, default=2048,
+		help ='Specify sampling rate')
+parser.add_argument('--detector', 
+		help ='Specify detector name', required=True, default='H1')
+parser.add_argument('--output_file', 
+		help ='specify output file', required=True)
+
+
+
+args, remaining_args = parser.parse_known_args()
+f_min = args.f_min
+delta_f = 1.0/args.sampling_freq
+delta_t = 1.0/args.sampling_rate
+detectorname = args.detector
+split_ind = args.split_ind
+nsplits = args.nsplits
+
+#f_min, delta_f, delta_t, detectorname = determine_values_from_parsing_config(config)
+
+if (args.HMs == 1):
+	HMs = True
+else:
+	HMs = False
+
+print('\t \t', 'Injection_file', args.injections, 'split_ind', split_ind)
+
+#Read injection
+sg = func.read_injections(args.injections)
+
+#Read PSD
+length = int(1.0/(delta_f*delta_t)/2 + 1)
+PSD = pycbc.psd.read.from_txt(args.psd_file, length, delta_f, f_min, is_asd_file=True)
+detect = detector.Detector(detectorname)
+
+#Compute Matches
+FF_array, recovered_tau, sigmasqs, best_template = func.compute_FF(args.template_bank, sg, args.sg_ind, args.indices_file, PSD, detect, delta_f, f_min, args.approximant_tb, args.approximant_sg, HMs, split_ind, nsplits)
+
+#Write Matches
+write(args.output_file, args.sg_ind, FF_array, recovered_tau, sigmasqs, sg, best_template)
+
+#/work/rahul.dhurkunde/HM_and_precession/scripts/compute_FF --approximant_tb IMRPhenomD --psd_file /work/rahul.dhurkunde/HM_and_precession/psds/small.txt --sampling_freq 32 --sampling_rate 2048 --detector H1 --template_bank sorted_bank.hdf --injections 0.hdf --psd_file small.txt --indices_file indices_0.hdf --nsplits 10 --split_ind 0 --f_min 30.0 --HMs 0 --approximant_sg IMRPhenomD --output_file H1-FF_0_0-0-10.hdf
