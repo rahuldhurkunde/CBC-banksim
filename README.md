@@ -101,7 +101,7 @@ Sections | Purpose
 
 + nworkflow -- Split the injections into multiple workflows. A value of **1** is recommended unless the template bank and no. of injections are very large.
 
-###[FF]
+### [FF]
 + approximant_tb and approximant_sg -- Approximants for the templates and signals respectively. Note only aligned spin templates are supported.
 + HMs (Only for signals)   -- Switch on-off the higher-modes of gravitaional wave. Provide **0** for no HMs and **1** to include HMs
 + sampling_freq and sampling_rate -- Provide the values ensuring the Nyquist criterion requirements.
