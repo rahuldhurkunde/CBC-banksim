@@ -25,6 +25,7 @@
     + [PSD - power spectral density of the detector](#psd---power-spectral-density-of-the-detector)
   * [Configuration file](#configuration-file)
     + [[Required]](#-required-)
+    + [[FF]](#FF)
 - [Running the code](#running-the-code)
         * [Generating the workflow](#generating-the-workflow)
       - [Submitting the workflow](#submitting-the-workflow)
