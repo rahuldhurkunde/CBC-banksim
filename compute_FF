@@ -40,7 +40,7 @@ def write(filename, sg_ind, FF_array, recovered_tau, sigmasqs, sg, best_template
 parser = ap.ArgumentParser()
 parser.add_argument('--psd_file', 
 		required = True,
-		help ='specify ASD file')
+		help ='specify PSD file')
 parser.add_argument('--injections', 
 		required = True,
 		help ='specify injection file')
