@@ -1,7 +1,7 @@
 
 # Banksim for simulated signals from compact binary mergers
 
-![](https://pandao.github.io/editor.md/images/logos/editormd-logo-180x180.png)
+<img src="https://user-images.githubusercontent.com/57347943/212838481-5f67c0d0-1607-4c69-9b72-f9c6143735b0.png" width="200"/>
 
 
 ### Features
@@ -15,10 +15,20 @@
 -- Support for launching multiple workflows in parallel
 
 **Table of Contents**
-
-[TOCM]
-
-[TOC]
+- [Banksim for simulated signals from compact binary mergers](#banksim-for-simulated-signals-from-compact-binary-mergers)
+    + [Features](#features)
+- [Requirements](#requirements)
+  * [PyCBC](#pycbc)
+  * [Input-files](#input-files)
+    + [Template Bank](#template-bank)
+    + [Injections](#injections)
+    + [PSD - power spectral density of the detector](#psd---power-spectral-density-of-the-detector)
+  * [Configuration file](#configuration-file)
+    + [[Required]](#-required-)
+- [Running the code](#running-the-code)
+        * [Generating the workflow](#generating-the-workflow)
+      - [Submitting the workflow](#submitting-the-workflow)
+      - [Consolidating the results](#consolidating-the-results)
 
 # Requirements
 ## PyCBC
