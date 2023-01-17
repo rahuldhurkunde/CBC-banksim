@@ -1,6 +1,6 @@
 #!/bin/bash
 
-dir='/work/rahul.dhurkunde/searches/eccentric-bns-search/banksim'
+dir='/work/rahul.dhurkunde/searches/banksim'
 
 first=0
 last=10
@@ -17,10 +17,7 @@ else
 	cd $1
     mkdir results
 
-    $dir/FF_parser --config-files $dir/workflow.ini \
-                            --template_bank /work/rahul.dhurkunde/searches/eccentric-bns-search/banks/spinecc/mtotal-10_ecc-0.28_spin-0.1/small_bank_sorted.hdf \
-                            --inj_file $dir/test.hdf \
-                            --psd_file $dir/o3psd.txt \
+    $dir/FF_parser --config-files $dir/example_workflow.ini \
                             --first $first \
                             --last $last 
     #./submit.sh

@@ -1,31 +1,30 @@
 #!/usr/bin/env python
+import sys 
+import os
+lib_path = '%s/libraries/' %os.path.dirname(__file__)
+sys.path.append(lib_path)
 
-import sys, os, logging
+import functions as func
 import argparse as ap
 import configparser
-import functions as func
 import pycbc
-from pycbc import waveform, conversions, filter, types, distributions, detector, psd
-import matplotlib.pyplot as plt
 import numpy as np
-import scipy
-import seaborn as sns
-import importlib
 import time
-import matplotlib.gridspec as gridspec
 import Pegasus.DAX3 as dax
 import pycbc.workflow as wf
 import pycbc.workflow.pegasus_workflow as wdax
 from pycbc.workflow import WorkflowConfigParser
 import h5py
 import math
-import os
 
 def determine_values_from_parsing_config(config):
     tau0_tolerance = float(config['Required']['tau0_tolerance'])
     nsplits = int(config['Required']['nsplits'])
     nworkflow = int(config['Required']['nworkflow'])
-    return tau0_tolerance, nsplits, nworkflow
+    template_bank = config['Files']['template_bank']
+    inj_file = config['Files']['inj_file']
+    psd_file = config['Files']['psd_file']
+    return tau0_tolerance, nsplits, nworkflow, template_bank, inj_file, psd_file
 
 class injs_and_tbsplits:
 	def __init__(self, inj, split_array):
@@ -36,10 +35,6 @@ def to_file(path, ifo=None):
     """ Takes a str and returns a pycbc.workflow.pegasus_workflow.File
     instance.
     """
-    #fil = wdax.File(os.path.basename(path))
-    #fil.ifo = ifo
-    #path = os.path.abspath(path)
-    #fil.PFN(path, "local")
     fil = pycbc.workflow.core.resolve_url_to_file(path)
     return fil
 
@@ -65,28 +60,32 @@ def find_nearest(array,value):
         return idx
 
 def quick_check_inj_and_template_taus(tb_tau0, sg):
+	injs_outside = []
 	for k in range(len(sg)):
 		if sg[k].tau0 < tb_tau0.min() or sg[k].tau0 > tb_tau0.max():
 			print('Injection no. ', k, 'is outside the template bank coverage \n \t use injections within the region')
-			exit()
-	print('All injections have Tau0s within the parameter region')
+			injs_outside.append(k)
+	print('\t Total ', len(injs_outside), 'injections outside the template bank')
+	return injs_outside
 
 def find_template_indices(tb_tau0, tau0_tolerance, inj_file):
 	sg = func.read_injections(inj_file)
 	indices_save_dir = os.getcwd() + "/indices"
-	quick_check_inj_and_template_taus(tb_tau0, sg)
+	injs_outside = quick_check_inj_and_template_taus(tb_tau0, sg)
 
 	if (os.path.isdir(indices_save_dir) == False):
 		sys.exit(' Please make a "/indices in the workflow directory ')
 	else:
 		indices = []
-		for k in range(len(sg)): 
-			low = sg[k].tau0 - tau0_tolerance
-			low_ind = find_nearest(tb_tau0, low)
-			high = sg[k].tau0 + tau0_tolerance
-			high_ind = find_nearest(tb_tau0, high) 
-
-			indices.append(np.array(range(low_ind, high_ind+1)))
+		for k in range(len(sg)):
+			if k in injs_outside:
+				indices.append([])
+			else: 
+				low = sg[k].tau0 - tau0_tolerance
+				low_ind = find_nearest(tb_tau0, low)
+				high = sg[k].tau0 + tau0_tolerance
+				high_ind = find_nearest(tb_tau0, high) 
+				indices.append(np.array(range(low_ind, high_ind+1)))
 
 	filename = indices_save_dir + "/template_indices.hdf"
 	save_indices_to_file(filename, indices)
@@ -107,16 +106,6 @@ def check_for_unfinished_jobs(first, last, nsplits):
 
 # Command line parser
 parser = ap.ArgumentParser()
-parser.add_argument('-inj', '--inj_file',
-		required = True, 
-		help ='specify injection file')
-parser.add_argument('--template_bank',
-		required = True, 
-		help ='specify Template bank file')
-parser.add_argument('--psd_file',
-		required = True, 
-		help ='specify PSD file')
-
 parser.add_argument("--output_dir", 
 		#default="output/", 
 		help="Path to output directory.")
@@ -153,16 +142,12 @@ wf.add_workflow_command_line_group(parser)
 args, remaining_args = parser.parse_known_args()
 config = configparser.ConfigParser()
 config.read(args.config_files[0])
-tau0_tolerance, nsplits, nworkflow = determine_values_from_parsing_config(config)
+tau0_tolerance, nsplits, nworkflow, template_bank, inj_file, psd_file = determine_values_from_parsing_config(config)
 
-inj_file = args.inj_file
 first = args.first
 last = args.last
-#tau0_threshold = args.tau0_threshold
-#nsplits = args.nsplits
-#nworkflow = args.nworkflow
 
-print('\n \t \t  Check before workflow is submitted \n \t Template bank - ', args.template_bank ,' \n \t Injection file - ',  inj_file, ' \n \t tau0_tolerance =', tau0_tolerance, ' \n \t No. of workflows', nworkflow, '\n \t TB splits per injection', nsplits, '\n \t PSD', args.psd_file, '\n')
+print('\n \t \t  Check before workflow is submitted \n \t Template bank - ', template_bank ,' \n \t Injection file - ',  inj_file, ' \n \t tau0_tolerance =', tau0_tolerance, ' \n \t No. of workflows', nworkflow, '\n \t TB splits per injection', nsplits, '\n \t PSD', psd_file, '\n')
 
 #Checking for unifinshed jobs
 unfinished_jobs = check_for_unfinished_jobs(first, last, nsplits)
@@ -170,7 +155,7 @@ injection_indices = [x.inj for x in unfinished_jobs]
 
 # Read and transfer TB only once
 start = time.time()
-tb = func.read_tb(args.template_bank)
+tb = func.read_tb(template_bank)
 tb_tau0 = np.array([x.tau0 for x in tb])
 end = time.time()
 print('Time taken to read the template bank', end-start)
@@ -196,8 +181,8 @@ for wf_ind in range(nworkflow):
 	
 	#Executable -- compute_FF
 	FF_exe = wf.Executable(workflow.cp, "FF", ifos=workflow.ifos, out_dir="../results/")
-	tbhand = to_file(args.template_bank)
-	psdhand = to_file(args.psd_file)
+	tbhand = to_file(template_bank)
+	psdhand = to_file(psd_file)
 
 	#Injections for the current workflow
 	jobs_to_exe = np.array_split(unfinished_jobs, nworkflow)[wf_ind] 
